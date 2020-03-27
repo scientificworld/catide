@@ -1,0 +1,258 @@
+#!/bin/bash
+clear
+if [ ! "$(uname)" == "Darwin" ];then
+	echo "运行环境非macOS。"
+	exit
+fi
+u=~
+v=0
+if [ -h "$0" ];then
+	p=$(dirname $(readlink "$0"))
+else
+	p=$(dirname $0)
+fi
+write(){
+	let l=l+1
+	#echo "($l)$1"
+	#echo "[$l]$1"
+	#echo "{$l}$1"
+	echo "|$l|$1"
+}
+point(){
+	a1[$m]=$l
+	let m=m+1
+}
+check(){
+	for ((t=0;t<$m;t++))
+	do
+		if [ "$c" -ge "${a1[$t]}" ];then
+			let c=c+1
+		fi
+	done
+}
+include(){
+	f=$1
+	shift
+	for ((t=1;t<=$#;t++))
+	do
+		if [ "$f" == "${t}" ];then
+			return 0
+		fi
+	done
+	return 1
+}
+update(){
+	echo "正在检查更新……"
+	t5=$(curl -s https://gitee.com/scientificworld/catide/raw/master/version)
+	if [ "$v" -lt "$t5" ];then
+		echo "发现新版本：2.$t5"
+		read -p "是否更新？(y/n)" i
+		if [[ "$i" == "y" || "$i" == "Y" ]];then
+			clear
+			echo "正在下载更新……"
+			curl -s $(curl -s https://gitee.com/scientificworld/catide/raw/master/path) > ~/catide.csp
+			if [ ! -f "$u/catide.csp" ];then
+				echo "更新失败。"
+				return
+			fi
+			clear
+			echo "正在安装更新……"
+			mkdir ~/catide_backup
+			cp -rf $p/setting ~/catide_backup/setting
+			cp -rf $p/project ~/catide_backup/project
+			cp -f ~/catide.csp ~/catide.zip
+			unzip -q -o ~/catide.zip
+			cp -f ~/catide/* $p/
+			open $p/catide
+			exit
+		fi
+	else
+		echo "已是最新版本。"
+	fi
+}
+recover(){
+	#u=~
+	if [ -d "$u/catide_backup" ];then
+		cp -rf ~/catide_backup/setting $p/setting
+		cp -rf ~/catide_backup/project $p/project
+		rm -rf ~/catide_backup
+		echo "更新完成。"
+	else
+		if [ -d "$p/default" ];then
+			cp -rf $p/default $p/setting
+		else
+			echo "找不到配置文件。"
+			#exit
+			special
+		fi
+	fi
+}
+path(){
+	echo "$p/project/$t2/$s" > $p/setting/2/current/path.ccf
+	echo "$s" > $p/setting/2/current/input.ccf
+}
+setup(){
+	if [ ! -f "$p/setting/2/current/profile/run" ];then
+                echo '#!/bin/bash' > $p/setting/2/current/profile/run
+		echo 'cd $(dirname $0)' >> $p/setting/2/current/profile/run
+		echo 'if [ "$1" == "compile" ];then' >> $p/setting/2/current/profile/run
+		echo "$(cat $p/setting/2/current/profile/command_c.ccf)" >> $p/setting/2/current/profile/run
+		echo 'fi' >> $p/setting/2/current/profile/run
+		echo 'if [ "$1" == "run" ];then' >> $p/setting/2/current/profile/run
+                echo "$(cat $p/setting/2/current/profile/command_r.ccf)" >> $p/setting/2/current/profile/run
+                echo 'fi' >> $p/setting/2/current/profile/run
+		echo 'if [ "$1" == "build" ];then' >> $p/setting/2/current/profile/run
+                echo "$(cat $p/setting/2/current/profile/command_b.ccf)" >> $p/setting/2/current/profile/run
+                echo 'fi' >> $p/setting/2/current/profile/run
+	fi
+        if [ ! -x "$p/setting/2/current/profile/run" ];then
+                chmod +x $p/setting/2/current/profile/run
+        fi
+}
+lang(){
+	cp $p/setting/2/ext/$t1.cep $p/setting/2/current/template.zip
+	unzip -q -o $p/setting/2/current/template.zip -d $p/setting/2/current
+	mv $p/setting/2/current/$t1 $p/setting/2/current/profile
+	rm -f $p/setting/2/current/template.zip
+	if [ -d "$p/setting/2/current/_MACOSX" ];then
+		rm -rf $p/setting/2/current/_MACOSX
+	fi
+}
+special(){
+	echo "正在启动特殊模式……"
+	mkdir $p/default $p/default/1 $p/default/2 $p/default/2/current $p/default/2/ext $p/default/2/current/profile
+	echo "0" > $p/default/2/config.ccf
+        echo "cplusplus" > $p/default/2/profile.ccf
+        echo "c++" > $p/default/2/setup.ccf
+        echo 'g++ -o $(cat ../path.ccf)/$(cat ../input.ccf) $(cat ../path.ccf)/$(cat ../input.ccf).cpp && $(cat ../path.ccf)/$(cat ../input.ccf)' > $p/default/2/current/profile/command_b.ccf
+        echo 'g++ -o $(cat ../path.ccf)/$(cat ../input.ccf) $(cat ../path.ccf)/$(cat ../input.ccf)' > $p/default/2/current/profile/command_c.ccf
+        echo '$(cat ../path.ccf)/$(cat ../input.ccf)' > $p/default/2/current/profile/command_r.ccf
+        echo "1" > $p/default/2/current/profile/compile.ccf
+        echo "" > $p/default/2/current/profile/description.ccf
+        echo "cpp" > $p/default/2/current/profile/filename.ccf
+        echo "c++" > $p/default/2/current/profile/name.ccf
+        echo "0" > $p/default/2/current/profile/shell.ccf
+	recover
+	lang
+	setup
+}
+echo "(>^ω^<) 正在启动catide……"
+if [ ! -h "/usr/local/bin/catide" ];then
+	sudo ln -snf $p/catide /usr/local/bin/catide
+fi
+if [ ! -h "$u/desktop/潮汐猫" ];then
+        sudo ln -snf $p/catide $u/desktop/潮汐猫
+fi
+if [ ! -d "$p/setting" ];then
+	recover
+fi
+t1=$(cat $p/setting/2/profile.ccf)
+t2=$(cat $p/setting/2/setup.ccf)
+#t6=$(cat $p/setting/2/config.ccf)
+if [ ! -d "$p/setting/2/current/profile" ];then
+	lang
+fi
+setup
+#if [ ! -e "$p/setting/2/current/dictionary.ccf" ];then
+#	echo "$p" > $p/setting/2/current/dictionary.ccf
+#fi
+t3=$(cat $p/setting/2/current/profile/filename.ccf)
+t4=$(cat $p/setting/2/current/profile/compile.ccf)
+#t6=$(cat $p/setting/2/current/profile/command_c.ccf)
+#t7=$(cat $p/setting/2/current/profile/command_r.ccf)
+#t8=$(cat $p/setting/2/current/profile/command_b.ccf)
+#t9=$(cat $p/setting/2/current/profile/command_s.ccf)
+#t10=$(cat $p/setting/2/current/profile/shell.ccf)
+#l=$(cat $p/setting/2/config.ccf)
+if [ "$(cat $p/setting/1/config.ccf)" == "1" ];then
+	update
+	sleep 2
+fi
+clear
+while true
+do
+	#_cpptide/_pytide/_javatide
+	echo "***************************************"
+	echo "*                                     *"
+	echo "*     ∧, ,,∧  oo     (>^ω^<)          *"
+	echo "*    /●   ● \        catide 潮汐猫    *"
+	echo "*    ╰/] - [\╯       v2.0             *"
+	echo "*                                     *"
+	echo "***************************************"
+	echo "接下来要做什么？"
+	l=0
+	m=0
+	write "编辑一个项目"
+	if [ "$t4" == "1" ];then
+		write "编译一个项目"
+	else
+		point
+	fi
+	write "运行一个项目"
+	if [ "$t4" == "1" ];then
+                write "编译并运行一个项目"
+	else
+		point
+        fi
+	write "退出潮汐猫"
+	check
+	read -p "请输入选项：" c
+	case $c in
+	1)
+	read -p "请输入项目名：" s
+	if [ ! -d "$p/project" ];then
+		mkdir $p/project
+	fi
+	if [ ! -d "$p/project/$t2" ];then
+                mkdir $p/project/$t2
+        fi
+	if [ ! -d "$p/project/$t2/$s" ];then
+                mkdir $p/project/$t2/$s
+        fi
+	vim $p/project/$t2/$s/$s.$t3
+	;;
+	2)
+	read -p "请输入项目名：" s
+	path
+	if [ ! -f "$p/project/$t2/$s/$s.$t3" ];then
+		echo "文件不存在。"
+		sleep 1
+	else
+		#$(cat $p/setting/2/current/profile/command_c.ccf)
+		$p/setting/2/current/profile/run compile
+	fi
+	;;
+	3)
+        read -p "请输入项目名：" s
+	path
+	if [ ! -f "$p/project/$t2/$s/$s.$t3" ];then
+                echo "文件不存在。"
+                sleep 1
+        else
+        	#$(cat $p/setting/2/current/profile/command_r.ccf)
+		$p/setting/2/current/profile/run run
+	fi
+	read
+	;;
+	4)
+        read -p "请输入项目名：" s
+	path
+	if [ ! -f "$p/project/$t2/$s/$s.$t3" ];then
+                echo "文件不存在。"
+                sleep 1
+        else
+        	#z="p=$p && s=$s && "$(cat $p/setting/2/current/profile/command_b.ccf)
+		#$(cat $p/setting/2/current/profile/command_b.ccf)
+		$p/setting/2/current/profile/run build
+	fi
+	read
+	;;
+	$l)
+	read -p "你确定要退出吗？" s
+	if [[ "$s" == "y" || "$s" == "Y" || "$s" == "yes" ]];then
+		exit
+	fi
+	;;
+	esac
+	clear
+done
